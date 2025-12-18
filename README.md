@@ -14,7 +14,12 @@ sudo pip install ansible
  
 # 4. 공통설치/elk 설치 전반부(playbook_part_one.yml)
 
-## 4.1 공통설치/elk 설치 전반부 설치
+## 4.1 주요 패키지 다운로드
+```
+ansible-playbook -i inventory.ini 00.preparing.yml
+```
+
+## 4.2 공통설치/elk 설치 전반부 설치
 ```
 ansible-playbook -i inventory.ini playbook_part_one.yml
 ```
