@@ -1,0 +1,40 @@
+---
+- name: moving prometheus package to prome_pkg_dir
+  hosts: master
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - import_tasks: 08.settings_prometheus/coping_packages.yml
+
+- name: prometheus common settings
+  hosts: all_hosts
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - import_tasks: 08.settings_prometheus/extracting_packages.yml
+    - import_tasks: 08.settings_prometheus/settings_node_exporter.yml
+    - import_tasks: 08.settings_prometheus/settings_process_exporter.yml
+- name: prometheus elk settings
+  hosts: elastic
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - import_tasks: 08.settings_prometheus/settings_elasticsearch_exporter.yml
+    - import_tasks: 08.settings_prometheus/settings_kafka_exporter.yml
+- name: prometheus master settings
+  hosts: master
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - import_tasks: 08.settings_prometheus/settings_mysqld_exporter.yml
+    - import_tasks: 08.settings_prometheus/settings_zookeeper_exporter.yml
+    - import_tasks: 08.settings_prometheus/settings_alertmanager.yml
+    - import_tasks: 08.settings_prometheus/settings_prometheus_server.yml

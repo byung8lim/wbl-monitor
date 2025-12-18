@@ -1,0 +1,74 @@
+---
+- name: Rollback td-agent on master
+  hosts: master
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: Stop td-agent service
+      ansible.builtin.systemd:
+        name: td-agent
+        state: stopped
+        enabled: false
+        daemon_reload: true
+      failed_when: false
+
+    - name: Remove td-agent systemd unit
+      ansible.builtin.file:
+        path: /usr/lib/systemd/system/td-agent.service
+        state: absent
+
+    - name: Remove td-agent configuration and data
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/td-agent/td-agent.conf
+        - /etc/td-agent
+        - /opt/td-agent
+        - /var/log/td-agent
+
+    - name: Reload systemd daemon
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - daemon-reload
+      changed_when: false
+
+- name: Rollback td-agent on elastic
+  hosts: elastic
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: Stop td-agent service
+      ansible.builtin.systemd:
+        name: td-agent
+        state: stopped
+        enabled: false
+        daemon_reload: true
+      failed_when: false
+
+    - name: Remove td-agent systemd unit
+      ansible.builtin.file:
+        path: /usr/lib/systemd/system/td-agent.service
+        state: absent
+
+    - name: Remove td-agent configuration and data
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/td-agent/td-agent.conf
+        - /etc/td-agent
+        - /opt/td-agent
+        - /var/log/td-agent
+
+    - name: Reload systemd daemon
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - daemon-reload
+      changed_when: false

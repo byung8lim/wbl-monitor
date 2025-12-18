@@ -1,0 +1,12 @@
+---
+- name: Write javaagent.conf
+  ansible.builtin.copy:
+    dest: "{{ otel_base_dir }}/conf/javaagent.conf"
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    content: |-
+      otel.service.name=openapi-pub
+      otel.exporter.otlp.endpoint=http://192.168.56.120:4317
+      otel.exporter.otlp.protocol=grpc
+      otel.resource.attributes=service.name=openapi-pub

@@ -1,0 +1,38 @@
+---
+- name: Rollback mysqld and grafana (master)
+  hosts: master
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: Stop grafana and mysqld services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+        daemon_reload: true
+      loop:
+        - grafana-server
+        - mysqld
+      failed_when: false
+
+    - name: Remove grafana configuration
+      ansible.builtin.file:
+        path: /etc/grafana/grafana.ini
+        state: absent
+
+    - name: Remove grafana data and log directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /var/lib/grafana
+        - /var/log/grafana
+
+    - name: Reload systemd daemon
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - daemon-reload
+      changed_when: false

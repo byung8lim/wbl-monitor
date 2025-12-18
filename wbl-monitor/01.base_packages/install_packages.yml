@@ -1,0 +1,18 @@
+---
+- name: RPM 파일 목록 확인
+  ansible.builtin.find:
+    paths: "{{ base_packages }}"
+    patterns: "*.rpm"
+    file_type: file
+  register: found_rpms
+
+- name: 로컬 RPM 패키지 일괄 설치 (yum install ./*.rpm)
+  ansible.builtin.shell: yum install -y --disablerepo=* --nogpgcheck ./*.rpm
+  args:
+    chdir: "{{ base_packages }}"
+  when: found_rpms.matched > 0
+
+- name: 설치할 RPM이 없습니다
+  ansible.builtin.debug:
+    msg: "{{ base_packages }} 경로에 RPM 파일이 없습니다."
+  when: found_rpms.matched == 0

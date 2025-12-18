@@ -1,0 +1,34 @@
+---
+- name: NTP 클라이언트 롤백 (elastic)
+  hosts: elastic
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: chronyd 서비스 중지 및 비활성화
+      ansible.builtin.service:
+        name: chronyd
+        state: stopped
+        enabled: false
+    - name: chrony.conf 삭제
+      ansible.builtin.file:
+        path: /etc/chrony.conf
+        state: absent
+
+- name: NTP 서버 롤백 (master)
+  hosts: master
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: chronyd 서비스 중지 및 비활성화
+      ansible.builtin.service:
+        name: chronyd
+        state: stopped
+        enabled: false
+    - name: chrony.conf 삭제
+      ansible.builtin.file:
+        path: /etc/chrony.conf
+        state: absent

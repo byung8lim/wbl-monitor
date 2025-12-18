@@ -1,0 +1,138 @@
+---
+- name: Write process_exporter.yml
+  ansible.builtin.copy:
+    dest: "{{ prometheus_base_dir }}/conf/prometheus.yml"
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    content: |-
+      process_names:
+      global:
+        scrape_interval:     {{ prome_scraping_interval }}
+        evaluation_interval: {{ prome_evaluation_interval }}
+      alerting:
+        alertmanagers:
+        - static_configs:
+          - targets:
+            - {{ alertmanager_endpoint }}
+      
+      rule_files:
+        - "{{ prometheus_base_dir }}/conf/rules.yml"
+      
+      scrape_configs:
+        - job_name: 'prometheus'
+      
+          static_configs:
+          - targets: ['localhost:9090']
+        - job_name: 'my_monitoring'
+          scrape_interval: '{{ prome_scraping_interval }}'
+          file_sd_configs:
+          - files:
+            - 'conf.d/*.yml'
+
+- name: Write elasticsearch.yml
+  ansible.builtin.copy:
+    dest: "{{ prometheus_base_dir }}/conf/conf.d/elasticsearch.yml"
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    content: |-
+      - targets: [{{ monitor_target_elastic }}]
+        labels:
+          job: 'elasticsearch'
+
+- name: Write kafka.yml
+  ansible.builtin.copy:
+    dest: "{{ prometheus_base_dir }}/conf/conf.d/kafka.yml"
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    content: |-
+      - targets: [{{ monitor_target_kafka }}]
+        labels:
+          job: 'kafka'
+
+- name: Write mysqld.yml
+  ansible.builtin.copy:
+    dest: "{{ prometheus_base_dir }}/conf/conf.d/mysqld.yml"
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    content: |-
+      - targets: [{{ monitor_target_mysqld }}]
+        labels:
+          job: 'mysql'
+
+- name: Write nodes.yml
+  ansible.builtin.copy:
+    dest: "{{ prometheus_base_dir }}/conf/conf.d/nodes.yml"
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    content: |-
+      - targets: [{{ monitor_target_node }}]
+        labels:
+          job: 'nodes'
+
+- name: Write process.yml
+  ansible.builtin.copy:
+    dest: "{{ prometheus_base_dir }}/conf/conf.d/process.yml"
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    content: |-
+      - targets: [{{ monitor_target_process }}]
+        labels:
+          job: 'processes'
+
+- name: Write zookeeper.yml
+  ansible.builtin.copy:
+    dest: "{{ prometheus_base_dir }}/conf/conf.d/zookeeper.yml"
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    content: |-
+      - targets: [{{ monitor_target_zookeeper }}]
+        labels:
+          job: 'zookeeper'
+
+- name: Write prometheus.service
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/prometheus.service"
+    mode: "0644"
+    owner: "root"
+    group: "root"
+    content: |-
+      [Unit]
+      Description=Prometheus
+      Documentation=https://prometheus.io/docs/introduction/overview/
+      Wants=network-online.target
+      After=network-online.target
+      
+      [Service]
+      Type=simple
+      Environment="GOMAXPROCS=1"
+      User={{ ansible_user }}
+      Group={{ ansible_user }}
+      ExecReload=/bin/kill -HUP
+      ExecStart={{ prometheus_base_dir }}/bin/prometheus \
+        --config.file={{ prometheus_base_dir }}/conf/prometheus.yml \
+        --storage.tsdb.path={{ prometheus_base_dir }}/data \
+        --web.console.templates={{ prometheus_base_dir }}/consoles \
+        --web.console.libraries={{ prometheus_base_dir }}/console_libraries \
+        --web.listen-address=0.0.0.0:9090 \
+        --web.enable-lifecycle \
+        --web.external-url=
+      
+      SyslogIdentifier=prometheus
+      Restart=on-failure
+      
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Enable and start prometheus service
+  ansible.builtin.systemd:
+    name: prometheus
+    daemon_reload: true
+    enabled: true
+    state: started

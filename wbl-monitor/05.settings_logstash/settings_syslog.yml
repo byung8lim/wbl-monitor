@@ -1,0 +1,80 @@
+---
+- name: Ensure logstash_syslog conf/data/logs directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+  loop:
+    - "{{ logstash_syslog_dir }}/config"
+    - "{{ logstash_syslog_dir }}/data"
+    - "{{ logstash_syslog_dir }}/logs"
+
+- name: Write logstash-syslog.conf
+  ansible.builtin.copy:
+    dest: "{{ logstash_syslog_dir }}/config/logstash-syslog.conf"
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    content: |-
+      input {
+        kafka {
+          bootstrap_servers => "{{ bootstrap_servers }}"
+          topics            => ["{{ syslog_topic }}"]
+          codec             => "json"
+          group_id          => "{{ syslog_group_id }}"
+          auto_offset_reset => "latest"
+        }
+      }
+      
+      filter {
+        # grok/mutate/json/etc
+      }
+      
+      output {
+        elasticsearch {
+          hosts    => ["{{ kibana_elastic_url }}"]
+      
+          user     => "{{ elasticsearch_username }}"
+          password => "{{ elasticsearch_password }}"
+      
+          index => "system-messages-%{+YYYY.MM.dd}"
+      
+          ssl_enabled => true
+          ssl_verification_mode => "none"
+          ilm_enabled => false
+        }
+      }
+
+- name: Install logstash-syslog.service unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/logstash-syslog.service
+    mode: "0644"
+    content: |-
+      [Unit]
+      Description=logstash-syslog
+      After=network.target
+      
+      [Service]
+      User={{ ansible_user }}
+      Group={{ ansible_user }}
+      Environment="LOGSTASH_HOME={{ logstash_syslog_dir }}"
+      ExecStart={{ logstash_base_dir }}/bin/logstash \
+        --path.data {{ logstash_syslog_dir }}/data \
+        --path.logs {{ logstash_syslog_dir }}/logs \
+        -f {{ logstash_syslog_dir }}/config/logstash-syslog.conf
+      
+      KillMode=process
+      Restart=on-failure
+      
+      [Install]
+      WantedBy=multi-user.target
+      Alias=logstash-syslog.service
+
+- name: Enable and start logstash-syslog service
+  ansible.builtin.systemd:
+    name: logstash-syslog
+    daemon_reload: true
+    enabled: true
+    state: started

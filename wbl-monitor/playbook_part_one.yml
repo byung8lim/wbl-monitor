@@ -1,0 +1,5 @@
+---
+- import_playbook: 01.base_packages.yml
+- import_playbook: 02.setting_shared_volume.yml
+- import_playbook: 03.setting_ntp.yml
+- import_playbook: 04.settings_elasticsearch.yml

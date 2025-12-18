@@ -1,0 +1,31 @@
+---
+- name: base packages 롤백 (elastic)
+  hosts: elastic
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: 대상 서버 base_packages 디렉터리 삭제
+      ansible.builtin.file:
+        path: "{{ base_packages }}"
+        state: absent
+
+- name: base packages 롤백 (master)
+  hosts: master
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: master base_packages 디렉터리 삭제
+      ansible.builtin.file:
+        path: "{{ base_packages }}"
+        state: absent
+
+    - name: 컨트롤러 캐시 디렉터리 삭제
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/base_packages_cache"
+        state: absent
+      delegate_to: localhost
+      run_once: true

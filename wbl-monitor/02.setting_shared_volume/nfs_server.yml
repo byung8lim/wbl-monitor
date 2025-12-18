@@ -1,0 +1,38 @@
+---
+- name: NFS 서버 패키지 설치
+  ansible.builtin.package:
+    name: nfs-utils
+    state: present
+
+- name: 데이터 디렉터리 생성
+  ansible.builtin.file:
+    path: "{{ data_path }}"
+    state: directory
+    mode: "0775"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+- name: 공유 디렉터리 생성
+  ansible.builtin.file:
+    path: "{{ nfs_export_path }}"
+    state: directory
+    mode: "0777"
+    owner: "nobody"
+    group: "nobody"
+
+- name: /etc/exports에 공유 설정 추가
+  ansible.builtin.lineinfile:
+    path: /etc/exports
+    line: "{{ nfs_export_path }} {{ nfs_host_cidr | default('*') }}(rw,sync,no_root_squash,no_subtree_check)"
+    create: true
+    mode: "0644"
+
+- name: nfs-server 서비스 활성화 및 시작
+  ansible.builtin.service:
+    name: nfs-server
+    state: started
+    enabled: true
+
+- name: exportfs 재적용
+  ansible.builtin.command: exportfs -ra
+  changed_when: false

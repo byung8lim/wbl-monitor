@@ -1,0 +1,30 @@
+---
+- name: Write elasticsearch_exporter.service
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/elasticsearch_exporter.service"
+    mode: "0644"
+    owner: "root"
+    group: "root"
+    content: |-
+      [Unit]
+      Description=elasticsearch_exporter
+      After=network.target
+      
+      [Service]
+      User={{ ansible_user }}
+      Restart=on-failure
+      Type=simple
+      ExecStart={{ prometheus_base_dir }}/bin/elasticsearch_exporter \
+             --web.listen-address={{ hostvars[inventory_hostname].ansible_host }}:9114 \
+             --es.uri="https://{{ elasticsearch_username }}:{{ elasticsearch_password }}@{{ hostvars[inventory_hostname].host_hostname }}:9200" \
+             --es.ca={{ elasticsearch_cert_dir }}/elastic-ca.crt
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Enable and start elasticsearch_exporter service
+  ansible.builtin.systemd:
+    name: elasticsearch_exporter
+    daemon_reload: true
+    enabled: true
+    state: started

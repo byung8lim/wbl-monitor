@@ -1,0 +1,104 @@
+---
+- name: Ensure kafka base directory exists
+  ansible.builtin.file:
+    path: "{{ kafka_base_dir }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+- name: Set kafka archive name
+  ansible.builtin.set_fact:
+    kafka_archive: "{{ (elk_packages_list | select('search', 'kafka') | list | first | default('')) | basename }}"
+
+- name: Fail if kafka archive is not defined
+  ansible.builtin.fail:
+    msg: "No kafka package found in elk_packages_list."
+  when: kafka_archive == ""
+
+- name: Extract kafka package to base directory
+  ansible.builtin.unarchive:
+    src: "{{ elk_packages_dir }}/{{ kafka_archive }}"
+    dest: "{{ kafka_base_dir }}"
+    remote_src: true
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    extra_opts:
+      - --strip-components=1
+
+- name: Ensure kafka working/data/conf/log directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+  loop:
+    - "{{ kafka_working_dir }}"
+    - "{{ kafka_data_dir }}"
+    - "{{ kafka_log_data }}"
+
+- name: Write server.properties
+  ansible.builtin.copy:
+    dest: "{{ kafka_base_dir }}/config/server.properties"
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    content: |-
+      broker.id={{ groups['elastic'].index(inventory_hostname) + 1 }}
+      listeners=PLAINTEXT://{{ hostvars[inventory_hostname].ansible_host | default(inventory_hostname) }}:9092
+      
+      num.network.threads=3
+      num.io.threads=8
+      
+      socket.send.buffer.bytes=102400
+      socket.receive.buffer.bytes=102400
+      socket.request.max.bytes=104857600
+      log.dirs={{ kafka_log_data }}
+      
+      num.partitions=1
+      num.recovery.threads.per.data.dir=1
+      
+      offsets.topic.replication.factor=1
+      transaction.state.log.replication.factor=1
+      transaction.state.log.min.isr=1
+      log.retention.hours=168
+      log.retention.check.interval.ms=300000
+      
+      zookeeper.connect={% for host in groups['elastic'] %}{{ hostvars[host].ansible_host | default(host) }}:2181{% if not loop.last %},{% endif %}{% endfor %}
+
+      zookeeper.connection.timeout.ms=18000
+      group.initial.rebalance.delay.ms=0
+
+- name: Install kafka.service unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/kafka.service
+    mode: "0644"
+    content: |-
+      [Unit]
+      Description=Apache Kafka
+      After=network.target
+      
+      [Service]
+      Type=simple
+      User={{ ansible_user | default('wbl') }}
+      Group={{ ansible_user | default('wbl') }}
+      SyslogIdentifier=kafka
+      Restart=on-failure
+      Environment="KAFKA_HEAP_OPTS=-Xmx{{ kafka_heap_size }} -Xms{{ kafka_heap_size }}"
+      Environment=JAVA_HOME=/opt/jdk
+      Environment=KFK_HOME={{ kafka_base_dir }}
+      Environment=LOG_DIR={{ kafka_log_data }}
+      ExecStart={{ kafka_base_dir }}/bin/kafka-server-start.sh {{ kafka_base_dir }}/config/server.properties
+      ExecStop={{ kafka_base_dir }}/bin/kafka-server-stop.sh {{ kafka_base_dir }}/config/server.properties
+      
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Enable and start kafka service
+  ansible.builtin.systemd:
+    name: kafka
+    daemon_reload: true
+    enabled: true
+    state: started
+

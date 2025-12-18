@@ -1,0 +1,81 @@
+---
+- name: Ensure otel working/data/conf/log directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+  loop:
+    - "{{ otel_base_dir }}/bin"
+    - "{{ otel_base_dir }}/conf"
+
+- name: Set openjdk archive name
+  ansible.builtin.set_fact:
+    openjdk_archive: "{{ (otel_pkg_list | select('search', 'openjdk') | list | first | default('')) | basename }}"
+
+- name: Fail if openjdk archive is not defined
+  ansible.builtin.fail:
+    msg: "No openjdk_archive package found in {{ otel_pkg_list }}."
+  when: openjdk_archive == ""
+
+- name: Extract openjdk package to base directory
+  ansible.builtin.unarchive:
+    src: "{{ otel_pkg_dir }}/{{ openjdk_archive }}"
+    dest: "{{ openjdk_dir }}"
+    remote_src: true
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+- name: Set javaagent archive name
+  ansible.builtin.set_fact:
+    javaagent_archive: "{{ (otel_pkg_list | select('search', 'javaagent') | list | first | default('')) | basename }}"
+
+- name: Fail if javaagent archive is not defined
+  ansible.builtin.fail:
+    msg: "No javaagent package found in {{ otel_pkg_list }}."
+  when: javaagent_archive == ""
+
+- name: Move javaagent_archive binaries to bin directory
+  ansible.builtin.command:
+    cmd: mv "{{ otel_pkg_dir }}/{{ javaagent_archive }}" "{{ otel_base_dir }}/bin/"
+    creates: "{{ otel_base_dir }}/bin/{{ javaagent_archive }}"
+    mode: "0665"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+- name: Set otelcol archive name
+  ansible.builtin.set_fact:
+    otelcol_archive: "{{ (otel_pkg_list | select('search', 'otelcol') | list | first | default('')) | basename }}"
+
+- name: Fail if otelcol archive is not defined
+  ansible.builtin.fail:
+    msg: "No otelcol package found in {{ otel_pkg_list }}."
+  when: otelcol_archive == ""
+
+- name: Extract otelcol package to base directory
+  ansible.builtin.unarchive:
+    src: "{{ otel_pkg_dir }}/{{ otelcol_archive }}"
+    dest: "{{ otel_base_dir }}/bin"
+    remote_src: true
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+- name: Set jaeger archive name
+  ansible.builtin.set_fact:
+    jaeger_archive: "{{ (otel_pkg_list | select('search', 'jaeger') | list | first | default('')) | basename }}"
+
+- name: Fail if jaeger archive is not defined
+  ansible.builtin.fail:
+    msg: "No jaeger package found in {{ otel_pkg_list }}."
+  when: jaeger_archive == ""
+
+- name: Extract node_exporter package to base directory
+  ansible.builtin.unarchive:
+    src: "{{ otel_pkg_dir }}/{{ jaeger_archive }}"
+    dest: "{{ otel_base_dir }}/bin"
+    remote_src: true
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    extra_opts:
+      - --strip-components=1

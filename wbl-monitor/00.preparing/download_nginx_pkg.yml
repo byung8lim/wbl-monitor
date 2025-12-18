@@ -1,0 +1,25 @@
+﻿---
+- name: nginx_pkg_dir 생성
+  ansible.builtin.file:
+    path: "{{ nginx_pkg_dir }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+- name: nginx RPM 다운로드
+  ansible.builtin.yum:
+    name: "nginx"
+    download_only: true
+    download_dir: "{{ nginx_pkg_dir }}"
+    state: present
+  become: true
+
+- name: nginx_pkg_dir 디렉토리 및 RPM 소유자 정렬
+  ansible.builtin.file:
+    path: "{{ nginx_pkg_dir }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    recurse: true

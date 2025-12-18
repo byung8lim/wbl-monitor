@@ -1,0 +1,15 @@
+---
+- name: base_packages RPM 목록 확인
+  ansible.builtin.find:
+    paths: "{{ base_packages }}"
+    patterns: "*.rpm"
+    file_type: file
+  register: found_rpms
+
+- name: RPM을 컨트롤러로 수집
+  ansible.builtin.fetch:
+    src: "{{ item.path }}"
+    dest: "{{ playbook_dir }}/base_packages_cache/"
+    flat: true
+  loop: "{{ found_rpms.files }}"
+  when: found_rpms.matched > 0

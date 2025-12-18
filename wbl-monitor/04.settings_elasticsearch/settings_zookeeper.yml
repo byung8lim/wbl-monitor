@@ -1,0 +1,101 @@
+---
+- name: Ensure ZooKeeper base directory exists
+  ansible.builtin.file:
+    path: "{{ zoo_base_dir }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+- name: Set ZooKeeper archive name
+  ansible.builtin.set_fact:
+    zookeeper_archive: "{{ (elk_packages_list | select('search', 'zookeeper') | list | first | default('')) | basename }}"
+
+- name: Fail if ZooKeeper archive is not defined
+  ansible.builtin.fail:
+    msg: "No ZooKeeper package found in elk_packages_list."
+  when: zookeeper_archive == ""
+
+- name: Extract ZooKeeper package to base directory
+  ansible.builtin.unarchive:
+    src: "{{ elk_packages_dir }}/{{ zookeeper_archive }}"
+    dest: "{{ zoo_base_dir }}"
+    remote_src: true
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    extra_opts:
+      - --strip-components=1
+
+- name: Ensure ZooKeeper working/data/conf/log directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+  loop:
+    - "{{ zoo_working_dir }}"
+    - "{{ zoo_data_dir }}"
+    - "{{ zoo_conf_data }}"
+    - "{{ zoo_log_data }}"
+
+- name: Write zoo.cfg
+  ansible.builtin.copy:
+    dest: "{{ zoo_conf_data }}/zoo.cfg"
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    content: |-
+      tickTime=2000
+      initLimit=10
+      syncLimit=5
+      dataDir={{ zoo_data_dir }}
+      clientPort=2181
+      maxClientCnxns=60
+      {% for host in groups['elastic'] %}
+      server.{{ loop.index }}={{ hostvars[host].ansible_host | default(host) }}:2888:3888
+      {% endfor %}
+
+- name: Set myid per elastic node
+  ansible.builtin.copy:
+    dest: "{{ zoo_data_dir }}/myid"
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    content: "{{ groups['elastic'].index(inventory_hostname) + 1 }}"
+
+- name: Install zoo.service unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/zoo.service
+    mode: "0644"
+    content: |-
+      [Unit]
+      Description=Apache Zookeeper
+      After=network.target
+
+      [Service]
+      Type=forking
+      User={{ ansible_user | default('wbl') }}
+      Group={{ ansible_user | default('wbl') }}
+      SyslogIdentifier=zookeeper
+      Restart=on-failure
+      RestartSec=0s
+      Environment=ZK_SERVER_HEAP=128
+      Environment=JAVA_HOME=/opt/jdk
+      Environment=ZK_HOME=/opt/zookeeper
+      Environment=ZOOCFGDIR={{ zoo_conf_data }}
+      Environment=ZOO_LOG_DIR={{ zoo_log_data }}
+      ExecStart=/opt/zookeeper/bin/zkServer.sh start {{ zoo_conf_data }}/zoo.cfg
+      ExecStop=/opt/zookeeper/bin/zkServer.sh stop {{ zoo_conf_data }}/zoo.cfg
+      ExecReload=/opt/zookeeper/bin/zkServer.sh restart {{ zoo_conf_data }}/zoo.cfg
+      WorkingDirectory={{ zoo_data_dir }}
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Enable and start zoo service
+  ansible.builtin.systemd:
+    name: zoo
+    daemon_reload: true
+    enabled: true
+    state: started

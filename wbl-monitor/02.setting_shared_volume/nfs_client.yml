@@ -1,0 +1,62 @@
+---
+- name: 로컬 RPM 전체 찾기 (의존성 포함 설치용)
+  ansible.builtin.find:
+    paths: "{{ base_packages }}"
+    patterns: "*.rpm"
+    file_type: file
+  register: local_rpms
+
+- name: 로컬 RPM 일괄 설치 (의존성 충족)
+  ansible.builtin.yum:
+    name: "{{ local_rpms.files | map(attribute='path') | list }}"
+    state: present
+    disablerepo: '*'
+    disable_gpg_check: true
+  when: local_rpms.matched > 0
+
+- name: NFS 클라이언트 필수 패키지 설치 (리포지토리 사용, 로컬 RPM 없을 때)
+  ansible.builtin.yum:
+    name:
+      - nfs-utils
+      - rpcbind
+      - quota
+      - libnfsidmap
+      - python3-pyyaml
+      - gssproxy
+    state: present
+  when: local_rpms.matched == 0
+
+- name: rpcbind 서비스 활성화 및 시작
+  ansible.builtin.service:
+    name: rpcbind
+    state: started
+    enabled: true
+
+- name: 데이터 디렉터리 생성
+  ansible.builtin.file:
+    path: "{{ data_path }}"
+    state: directory
+    mode: "0775"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+- name: 공유 디렉터리 생성
+  ansible.builtin.file:
+    path: "{{ nfs_export_path }}"
+    state: directory
+    mode: "0777"
+    owner: "nobody"
+    group: "nobody"
+
+- name: systemd daemon-reload 수행
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: NFS 마운트(fstab 등록 포함)
+  ansible.posix.mount:
+    path: "{{ nfs_export_path }}"
+    src: "{{ hostvars[groups['master'][0]].ansible_host | default(groups['master'][0]) }}:{{ nfs_export_path }}"
+    fstype: nfs
+    opts: defaults,_netdev
+    state: mounted
+    fstab: /etc/fstab

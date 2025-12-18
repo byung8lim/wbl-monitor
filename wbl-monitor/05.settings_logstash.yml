@@ -1,0 +1,11 @@
+---
+- name: NTP 서버 설정 (master)
+  hosts: master
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - import_tasks: 05.settings_logstash/extracting_logstash.yml
+    - import_tasks: 05.settings_logstash/settings_syslog.yml
+    - import_tasks: 05.settings_logstash/settings_nginx_access.yml

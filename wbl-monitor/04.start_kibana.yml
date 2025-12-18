@@ -1,0 +1,14 @@
+---
+- name: Rollback ELK packages preparation (master)
+  hosts: master
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+  - name: Enable and start kibana service
+    ansible.builtin.systemd:
+      name: kibana
+      daemon_reload: true
+      enabled: true
+      state: started

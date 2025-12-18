@@ -1,0 +1,317 @@
+---
+- name: Ensure prometheus working/data/conf/log directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+  loop:
+    - "{{ prometheus_base_dir }}/bin"
+    - "{{ prometheus_base_dir }}/conf"
+    - "{{ prometheus_base_dir }}/conf/conf.d"
+    - "{{ prometheus_base_dir }}/data"
+    - "{{ prometheus_base_dir }}/consoles"
+    - "{{ prometheus_base_dir }}/console_libraries"
+
+- name: Set prometheus archive name
+  ansible.builtin.set_fact:
+    prometheus_archive: "{{ (prometheus_pkg_list | select('search', 'prometheus') | list | first | default('')) | basename }}"
+
+- name: Fail if prometheus archive is not defined
+  ansible.builtin.fail:
+    msg: "No prometheus package found in {{ prometheus_pkg_list }}."
+  when: prometheus_archive == ""
+
+- name: Extract prometheus package to base directory
+  ansible.builtin.unarchive:
+    src: "{{ prome_pkg_dir }}/{{ prometheus_archive }}"
+    dest: "{{ prometheus_base_dir }}"
+    remote_src: true
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    extra_opts:
+      - --strip-components=1
+    creates: "{{ prometheus_base_dir }}/conf/prometheus.yml"
+
+- name: Move prometheus binaries to bin directory
+  ansible.builtin.command:
+    cmd: mv "{{ prometheus_base_dir }}/{{ item }}" "{{ prometheus_base_dir }}/bin/"
+    creates: "{{ prometheus_base_dir }}/bin/{{ item }}"
+  loop:
+    - prometheus
+    - promtool
+
+- name: Ensure prometheus binaries are executable
+  ansible.builtin.file:
+    path: "{{ prometheus_base_dir }}/bin/{{ item }}"
+    state: file
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+  loop:
+    - prometheus
+    - promtool
+
+- name: Set alertmanager archive name
+  ansible.builtin.set_fact:
+    alertmanager_archive: "{{ (prometheus_pkg_list | select('search', 'alertmanager') | list | first | default('')) | basename }}"
+
+- name: Fail if alertmanager archive is not defined
+  ansible.builtin.fail:
+    msg: "No alertmanager package found in {{ prometheus_pkg_list }}."
+  when: alertmanager_archive == ""
+
+- name: Extract alertmanager package to base directory
+  ansible.builtin.unarchive:
+    src: "{{ prome_pkg_dir }}/{{ alertmanager_archive }}"
+    dest: "{{ prometheus_base_dir }}"
+    remote_src: true
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    extra_opts:
+      - --strip-components=1
+
+- name: Move alertmanager binaries to bin directory
+  ansible.builtin.command:
+    cmd: mv "{{ prometheus_base_dir }}/{{ item }}" "{{ prometheus_base_dir }}/bin/"
+    creates: "{{ prometheus_base_dir }}/bin/{{ item }}"
+  loop:
+    - alertmanager
+    - amtool
+
+- name: Ensure alertmanager binaries are executable
+  ansible.builtin.file:
+    path: "{{ prometheus_base_dir }}/bin/{{ item }}"
+    state: file
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+  loop:
+    - alertmanager
+    - amtool
+
+- name: Set mysqld_exporter archive name
+  ansible.builtin.set_fact:
+    mysqld_exporter_archive: "{{ (prometheus_pkg_list | select('search', 'mysqld_exporter') | list | first | default('')) | basename }}"
+
+- name: Fail if mysqld_exporter archive is not defined
+  ansible.builtin.fail:
+    msg: "No mysqld_exporter package found in {{ prometheus_pkg_list }}."
+  when: mysqld_exporter_archive == ""
+
+- name: Extract mysqld_exporter package to base directory
+  ansible.builtin.unarchive:
+    src: "{{ prome_pkg_dir }}/{{ mysqld_exporter_archive }}"
+    dest: "{{ prometheus_base_dir }}"
+    remote_src: true
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    extra_opts:
+      - --strip-components=1
+    creates: "{{ prometheus_base_dir }}/conf/my.cnf"
+
+- name: Move mysqld_exporter binaries to bin directory
+  ansible.builtin.command:
+    cmd: mv "{{ prometheus_base_dir }}/mysqld_exporter" "{{ prometheus_base_dir }}/bin/"
+    creates: "{{ prometheus_base_dir }}/bin/mysqld_exporter"
+
+- name: Ensure mysqld_exporter binaries are executable
+  ansible.builtin.file:
+    path: "{{ prometheus_base_dir }}/bin/mysqld_exporter"
+    state: file
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+- name: Set node_exporter archive name
+  ansible.builtin.set_fact:
+    node_exporter_archive: "{{ (prometheus_pkg_list | select('search', 'node_exporter') | list | first | default('')) | basename }}"
+
+- name: Fail if node_exporter archive is not defined
+  ansible.builtin.fail:
+    msg: "No node_exporter package found in {{ prometheus_pkg_list }}."
+  when: node_exporter_archive == ""
+
+- name: Extract node_exporter package to base directory
+  ansible.builtin.unarchive:
+    src: "{{ prome_pkg_dir }}/{{ node_exporter_archive }}"
+    dest: "{{ prometheus_base_dir }}"
+    remote_src: true
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    extra_opts:
+      - --strip-components=1
+    creates: "{{ prometheus_base_dir }}/conf/node_exporter.conf"
+
+- name: Move node_exporter binaries to bin directory
+  ansible.builtin.command:
+    cmd: mv "{{ prometheus_base_dir }}/node_exporter" "{{ prometheus_base_dir }}/bin/"
+    creates: "{{ prometheus_base_dir }}/bin/node_exporter"
+
+- name: Ensure node_exporter binaries are executable
+  ansible.builtin.file:
+    path: "{{ prometheus_base_dir }}/bin/node_exporter"
+    state: file
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+- name: Set process-exporter archive name
+  ansible.builtin.set_fact:
+    process_exporter_archive: "{{ (prometheus_pkg_list | select('search', 'process-exporter') | list | first | default('')) | basename }}"
+
+- name: Fail if process-exporter archive is not defined
+  ansible.builtin.fail:
+    msg: "No process-exporter package found in {{ prometheus_pkg_list }}."
+  when: process_exporter_archive == ""
+
+- name: Extract process-exporter package to base directory
+  ansible.builtin.unarchive:
+    src: "{{ prome_pkg_dir }}/{{ process_exporter_archive }}"
+    dest: "{{ prometheus_base_dir }}"
+    remote_src: true
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    extra_opts:
+      - --strip-components=1
+    creates: "{{ prometheus_base_dir }}/conf/process-exporter.conf"
+
+- name: Move process-exporter binaries to bin directory
+  ansible.builtin.command:
+    cmd: mv "{{ prometheus_base_dir }}/process-exporter" "{{ prometheus_base_dir }}/bin/"
+    creates: "{{ prometheus_base_dir }}/bin/process-exporter"
+
+- name: Ensure process-exporter binaries are executable
+  ansible.builtin.file:
+    path: "{{ prometheus_base_dir }}/bin/process-exporter"
+    state: file
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+- name: Set nginx-prometheus-exporter archive name
+  ansible.builtin.set_fact:
+    nginx_exporter_archive: "{{ (prometheus_pkg_list | select('search', 'nginx-prometheus-exporter') | list | first | default('')) | basename }}"
+
+- name: Fail if nginx-prometheus-exporter archive is not defined
+  ansible.builtin.fail:
+    msg: "No nginx-prometheus-exporter package found in {{ prometheus_pkg_list }}."
+  when: nginx_exporter_archive == ""
+
+- name: Extract nginx-prometheus-exporter package to base directory
+  ansible.builtin.unarchive:
+    src: "{{ prome_pkg_dir }}/{{ nginx_exporter_archive }}"
+    dest: "{{ prometheus_base_dir }}"
+    remote_src: true
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+- name: Move nginx-prometheus-exporter binaries to bin directory
+  ansible.builtin.command:
+    cmd: mv "{{ prometheus_base_dir }}/nginx-prometheus-exporter" "{{ prometheus_base_dir }}/bin/"
+    creates: "{{ prometheus_base_dir }}/bin/nginx-prometheus-exporter"
+
+- name: Ensure nginx-prometheus-exporter binaries are executable
+  ansible.builtin.file:
+    path: "{{ prometheus_base_dir }}/bin/nginx-prometheus-exporter"
+    state: file
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+- name: Set zookeeper-exporter archive name
+  ansible.builtin.set_fact:
+    zookeeper_exporter_archive: "{{ (prometheus_pkg_list | select('search', 'zookeeper-exporter') | list | first | default('')) | basename }}"
+
+- name: Fail if zookeeper-exporter archive is not defined
+  ansible.builtin.fail:
+    msg: "No zookeeper-exporter package found in {{ prometheus_pkg_list }}."
+  when: zookeeper_exporter_archive == ""
+
+- name: Extract zookeeper-exporter package to base directory
+  ansible.builtin.unarchive:
+    src: "{{ prome_pkg_dir }}/{{ zookeeper_exporter_archive }}"
+    dest: "{{ prometheus_base_dir }}"
+    remote_src: true
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    extra_opts:
+      - --strip-components=1
+
+- name: Move zookeeper-exporter binaries to bin directory
+  ansible.builtin.command:
+    cmd: mv "{{ prometheus_base_dir }}/zookeeper-exporter" "{{ prometheus_base_dir }}/bin/"
+    creates: "{{ prometheus_base_dir }}/bin/zookeeper-exporter"
+
+- name: Ensure zookeeper-exporter binaries are executable
+  ansible.builtin.file:
+    path: "{{ prometheus_base_dir }}/bin/zookeeper-exporter"
+    state: file
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+- name: Set kafka_exporter archive name
+  ansible.builtin.set_fact:
+    kafka_exporter_archive: "{{ (prometheus_pkg_list | select('search', 'kafka_exporter') | list | first | default('')) | basename }}"
+
+- name: Fail if kafka_exporter archive is not defined
+  ansible.builtin.fail:
+    msg: "No kafka_exporter package found in {{ prometheus_pkg_list }}."
+  when: kafka_exporter_archive == ""
+
+- name: Extract kafka_exporter package to base directory
+  ansible.builtin.unarchive:
+    src: "{{ prome_pkg_dir }}/{{ kafka_exporter_archive }}"
+    dest: "{{ prometheus_base_dir }}"
+    remote_src: true
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    extra_opts:
+      - --strip-components=1
+
+- name: Move kafka_exporter binaries to bin directory
+  ansible.builtin.command:
+    cmd: mv "{{ prometheus_base_dir }}/kafka_exporter" "{{ prometheus_base_dir }}/bin/"
+    creates: "{{ prometheus_base_dir }}/bin/kafka_exporter"
+
+- name: Ensure kafka_exporter binaries are executable
+  ansible.builtin.file:
+    path: "{{ prometheus_base_dir }}/bin/kafka_exporter"
+    state: file
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+- name: Set elasticsearch_exporter archive name
+  ansible.builtin.set_fact:
+    elasticsearch_exporter_archive: "{{ (prometheus_pkg_list | select('search', 'elasticsearch_exporter') | list | first | default('')) | basename }}"
+
+- name: Fail if elasticsearch_exporter archive is not defined
+  ansible.builtin.fail:
+    msg: "No elasticsearch_exporter package found in {{ prometheus_pkg_list }}."
+  when: elasticsearch_exporter_archive == ""
+
+- name: Extract elasticsearch_exporter package to base directory
+  ansible.builtin.unarchive:
+    src: "{{ prome_pkg_dir }}/{{ elasticsearch_exporter_archive }}"
+    dest: "{{ prometheus_base_dir }}"
+    remote_src: true
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    extra_opts:
+      - --strip-components=1
+
+- name: Move elasticsearch_exporter binaries to bin directory
+  ansible.builtin.command:
+    cmd: mv "{{ prometheus_base_dir }}/elasticsearch_exporter" "{{ prometheus_base_dir }}/bin/"
+    creates: "{{ prometheus_base_dir }}/bin/elasticsearch_exporter"
+
+- name: Ensure elasticsearch_exporter binaries are executable
+  ansible.builtin.file:
+    path: "{{ prometheus_base_dir }}/bin/elasticsearch_exporter"
+    state: file
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"

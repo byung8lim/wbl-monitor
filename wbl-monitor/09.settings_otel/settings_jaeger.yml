@@ -1,0 +1,43 @@
+---
+- name: Write jaeger.service
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/jaeger.service"
+    mode: "0644"
+    owner: "root"
+    group: "root"
+    content: |-
+      [Unit]
+      Description=Jaeger all-in-one (collector + query + UI)
+      After=network.target
+      
+      [Service]
+      User={{ ansible_user }}
+      Group={{ ansible_user }}
+      Restart=on-failure
+      
+      Environment=SPAN_STORAGE_TYPE=elasticsearch
+      Environment=ES_SERVER_URLS={{ jaeger_elastic_endpoint }}
+      Environment=ES_USERNAME={{ elasticsearch_username }}
+      Environment=ES_PASSWORD={{ elasticsearch_password }}
+      
+      Environment=ES_TLS_ENABLED=true
+      Environment=ES_TLS_SKIP_HOST_VERIFY=true
+      
+      Environment=ES_VERSION=8
+      
+      ExecStart={{ otel_base_dir }}/bin/jaeger-all-in-one \
+        --collector.otlp.enabled=true \
+        --collector.otlp.grpc.host-port={{ jaeger_grpc_endpoint }} \
+        --collector.otlp.http.host-port={{ jaeger_http_endpoint }} \
+        --query.http-server.host-port={{ jaeger_query_endpoint }}
+      
+      [Install]
+      WantedBy=multi-user.target
+
+
+- name: Enable and start jaeger service
+  ansible.builtin.systemd:
+    name: jaeger
+    daemon_reload: true
+    enabled: true
+    state: started

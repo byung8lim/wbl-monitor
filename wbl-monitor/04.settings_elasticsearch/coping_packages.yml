@@ -1,0 +1,44 @@
+---
+- name: Ensure ELK packages dire in nfs
+  ansible.builtin.file:
+    path: "{{ elk_packages_dir }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+- name: Ensure ELK tmp dir exists
+  ansible.builtin.file:
+    path: "{{ elk_tmp_dir }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+- name: Find downloaded ELK packages in tmp dir
+  ansible.builtin.find:
+    paths: "{{ elk_tmp_dir }}"
+    file_type: file
+  register: elk_tmp_files
+
+- name: Copy ELK packages from tmp dir to nfs dir
+  ansible.builtin.copy:
+    src: "{{ item.path }}"
+    dest: "{{ elk_packages_dir }}/{{ item.path | basename }}"
+    remote_src: true
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+  loop: "{{ elk_tmp_files.files }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
+  when: elk_tmp_files.matched | int > 0
+
+- name: Remove ELK packages from tmp dir after copy
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ elk_tmp_files.files }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
+  when: elk_tmp_files.matched | int > 0

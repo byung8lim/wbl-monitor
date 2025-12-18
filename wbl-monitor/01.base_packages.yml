@@ -1,0 +1,32 @@
+---
+- name: base packages 다운로드 (master)
+  hosts: master
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - import_tasks: 01.base_packages/collect_packages.yml
+    - import_tasks: 01.base_packages/installing_nginx.yml
+      tags: collect_packages
+
+- name: base packages 전송 (elastic)
+  hosts: elastic
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - import_tasks: 01.base_packages/make_package_dir.yml
+      tags: package_dir
+    - import_tasks: 01.base_packages/send_packages.yml
+      tags: send_packages
+- name: base packages 설치 (elastic)
+  hosts: all_hosts
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - import_tasks: 01.base_packages/install_packages.yml
+      tags: install_packages

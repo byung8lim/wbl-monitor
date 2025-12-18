@@ -1,0 +1,10 @@
+---
+- import_playbook: 09.rollback.yml
+- import_playbook: 08.rollback.yml
+- import_playbook: 07.rollback.yml
+- import_playbook: 06.rollback.yml
+- import_playbook: 05.rollback.yml
+- import_playbook: 04.rollback.yml
+- import_playbook: 03.rollback.yml
+- import_playbook: 02.rollback.yml
+- import_playbook: 01.rollback.yml

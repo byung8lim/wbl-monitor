@@ -1,0 +1,98 @@
+---
+- name: Ensure logstash_nginx conf/data/logs directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+  loop:
+    - "{{ logstash_nginx_dir }}/config"
+    - "{{ logstash_nginx_dir }}/data"
+    - "{{ logstash_nginx_dir }}/patterns"
+    - "{{ logstash_nginx_dir }}/logs"
+
+- name: Write nginx patterns
+  ansible.builtin.copy:
+    dest: "{{ logstash_nginx_dir }}/patterns/nginx"
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    content: |-
+      NGINX_ACCESS %{IPORHOST:clientip} (?:-|(%{WORD}.%{WORD})) %{USER:ident} \[%{HTTPDATE:timestamp}\] "(?:%{WORD:verb} %{NOTSPACE:request}(?: HTTP/%{NUMBER:httpversion})?|%{DATA:rawrequest})" %{NUMBER:response} (?:%{NUMBER:bytes}|-) "%{QS:referrer}" "%{QS:agent}" "%{IPORHOST:x-forwarded-for}"
+      NGINX_ACCESS_EX  %{IPORHOST:clientip} (?:-|(%{WORD}.%{WORD})) %{USER:ident} \[%{HTTPDATE:timestamp}\] "(?:%{WORD:verb} %{NOTSPACE:request}(?: HTTP/%{NUMBER:httpversion})?|%{DATA:rawrequest})" %{NUMBER:response} (?:%{NUMBER:bytes}|-) "%{QS:referrer}" "%{QS:agent}" "%{IPORHOST:x-forwarded-for}" %{NUMBER:request_time}
+
+- name: Write logstash-nginx.conf
+  ansible.builtin.copy:
+    dest: "{{ logstash_nginx_dir }}/config/logstash-nginx.conf"
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    content: |-
+      input {
+        kafka {
+          bootstrap_servers => "{{ bootstrap_servers }}"
+          type => "nginx"
+          group_id => "{{ nginx_group_id }}"
+          topics => ["{{ nginx_topic }}"]
+          decorate_events => true
+        }
+      }
+      
+      filter {
+        if [type] == "nginx" {
+          urldecode {
+            field => "message"
+          }
+          grok {
+              patterns_dir => "{{ logstash_nginx_dir }}/patterns/nginx"
+              match => { "message" => "%{NGINX_ACCESS}" }
+              remove_tag => ["_grokparsefailure"]
+              add_tag => ["nginx_access"]
+          }
+        }
+      }
+      output {
+        elasticsearch {
+          hosts => ["{{ kibana_elastic_url }}"]
+          user     => "{{ elasticsearch_username }}"
+          password => "{{ elasticsearch_password }}"
+      
+          index => "nginx-access-%{+YYYY.MM.dd}"
+          ssl_enabled => true
+          ssl_verification_mode => "none"
+          ilm_enabled => false
+        }
+      }
+
+- name: Install logstash-nginx.service unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/logstash-nginx.service
+    mode: "0644"
+    content: |-
+      [Unit]
+      Description=logstash-nginx
+      After=network.target
+      
+      [Service]
+      User=wbl
+      Group=wbl
+      Environment="LOGSTASH_HOME={{ logstash_nginx_dir }}"
+      ExecStart={{ logstash_base_dir }}/bin/logstash \
+        --path.data {{ logstash_nginx_dir }}/data \
+        --path.logs {{ logstash_nginx_dir }}/logs \
+        -f {{ logstash_nginx_dir }}/config/logstash-nginx.conf
+      
+      KillMode=process
+      Restart=on-failure
+      
+      [Install]
+      WantedBy=multi-user.target
+      Alias=logstash-nginx.service
+
+- name: Enable and start logstash-nginx service
+  ansible.builtin.systemd:
+    name: logstash-nginx
+    daemon_reload: true
+    enabled: true
+    state: started

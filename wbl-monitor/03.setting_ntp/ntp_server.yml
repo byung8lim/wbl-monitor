@@ -1,0 +1,40 @@
+---
+- name: chrony.conf 구성 (master)
+  ansible.builtin.copy:
+    dest: /etc/chrony.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible - NTP server config
+      {% for server in ntp_servers %}
+      server {{ server }} iburst
+      {% endfor %}
+      local stratum 10
+
+      sourcedir /run/chrony-dhcp
+      driftfile /var/lib/chrony/drift
+      makestep 1.0 3
+      rtcsync
+
+      # allow local network
+      allow {{ ntp_allow_cidr }}
+
+      keyfile /etc/chrony.keys
+      ntsdumpdir /var/lib/chrony
+      leapsectz right/UTC
+      logdir /var/log/chrony
+
+- name: chronyd 서비스 활성화 및 시작 (master)
+  ansible.builtin.service:
+    name: chronyd
+    state: restarted
+    enabled: true
+
+- name: NTP 포트 허용 (firewalld)
+  ansible.posix.firewalld:
+    service: ntp
+    state: enabled
+    permanent: true
+    immediate: true
+  ignore_errors: true

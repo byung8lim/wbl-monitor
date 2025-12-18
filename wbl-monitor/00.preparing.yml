@@ -1,0 +1,24 @@
+---
+- name: base packages 다운로드 (master)
+  hosts: master
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - import_tasks: 00.preparing/download_base_pkg.yml
+      tags: base_pkg
+    - import_tasks: 00.preparing/download_nginx_pkg.yml
+      tags: nginx_pkg
+    - import_tasks: 00.preparing/download_elk_pkg.yml
+      tags: elk_pkg
+    - import_tasks: 00.preparing/download_fluentd_pkg.yml
+      tags: fluentd_pkg
+    - import_tasks: 00.preparing/download_prome_pkg.yml
+      tags: prome_pkg
+    - import_tasks: 00.preparing/download_grafana_pkg.yml
+      tags: grafana_pkg
+    - import_tasks: 00.preparing/download_mysql_pkg.yml
+      tags: mysql_pkg
+    - import_tasks: 00.preparing/download_otel_pkg.yml
+      tags: otel_pkg

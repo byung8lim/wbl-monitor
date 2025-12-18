@@ -1,0 +1,41 @@
+---
+- name: Rollback OTEL and Jaeger (master)
+  hosts: master
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: Stop otel/jaeger services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+        daemon_reload: true
+      loop:
+        - otel-collector
+        - jaeger
+      failed_when: false
+
+    - name: Remove otel/jaeger systemd units
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/systemd/system/otel-collector.service
+        - /etc/systemd/system/jaeger.service
+
+    - name: Remove OTEL and Jaeger directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ otel_base_dir }}"
+        - "{{ openjdk_dir }}"
+
+    - name: Reload systemd daemon
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - daemon-reload
+      changed_when: false

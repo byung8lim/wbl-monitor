@@ -1,0 +1,42 @@
+---
+- name: Rollback logstash setup (master)
+  hosts: master
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: Stop logstash services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+        daemon_reload: true
+      loop:
+        - logstash-syslog
+        - logstash-nginx
+      failed_when: false
+
+    - name: Remove logstash systemd units
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/systemd/system/logstash-syslog.service
+        - /etc/systemd/system/logstash-nginx.service
+
+    - name: Remove logstash data and configs
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ logstash_syslog_dir }}"
+        - "{{ logstash_nginx_dir }}"
+        - "{{ logstash_base_dir }}"
+
+    - name: Reload systemd daemon
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - daemon-reload
+      changed_when: false

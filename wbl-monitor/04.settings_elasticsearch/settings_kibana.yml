@@ -1,0 +1,100 @@
+---
+- name: Write node.options
+  ansible.builtin.copy:
+    dest: "{{ kibana_base_dir }}/config/node.options"
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    content: |-
+      --max-old-space-size=1024
+      --unhandled-rejections=warn
+      --dns-result-order=ipv4first
+      --no-experimental-require-module
+
+- name: Distribute cert archive to kibana
+  ansible.builtin.unarchive:
+    src: "{{ elasticsearch_ca_shared_dir }}/elasticsearch-certs.tgz"
+    dest: "{{ kibana_base_dir }}/config/certs"
+    remote_src: false
+  become: true
+  become_user: "{{ ansible_user | default('wbl') }}"
+
+- name: Ensure cert files have correct ownership and permissions
+  ansible.builtin.file:
+    path: "{{ kibana_base_dir }}/config/certs"
+    state: directory
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    mode: "0755"
+    recurse: true
+  become: true
+  become_user: root
+
+- name: Write kibana.yml
+  ansible.builtin.copy:
+    dest: "{{ kibana_base_dir }}/config/kibana.yml"
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    content: |-
+      server.port: {{ kibana_service_port }}
+      server.host: "{{ kibana_service_ip }}"
+      server.name: "{{ kibana_service_name }}"
+      
+      elasticsearch.hosts: ["{{ kibana_elastic_url }}"]
+      
+      elasticsearch.username: "{{ kibana_elastic_username }}"
+      elasticsearch.password: "{{ kibana_elastic_password }}"
+      
+      elasticsearch.ssl.certificateAuthorities: ["{{ kibana_base_dir }}/config/certs/{{ elasticsearch_ca_cert }}"]
+      elasticsearch.ssl.verificationMode: full
+
+- name: Install kibana.service unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/kibana.service
+    mode: "0644"
+    content: |-
+      [Unit]
+      Description=Kibana
+      After=network-online.target
+      
+      [Service]
+      User={{ ansible_user }}
+      Group={{ ansible_user }}
+      Environment="KBN_PATH_CONF={{ kibana_base_dir }}/config"
+      ExecStart={{ kibana_base_dir }}/bin/kibana
+      KillMode=process
+      Restart=on-failure
+      
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Write kibana.conf for nginx
+  ansible.builtin.copy:
+    dest: "/etc/nginx/conf.d/kibana.conf"
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    content: |-
+server {
+        listen       15601;
+        access_log  /var/log/nginx/kibana-access.log;
+        server_tokens off;
+        root    html;
+        location / {
+            if ($request_method !~ ^(GET|POST)$) {
+                return 404;
+            }
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection ‘upgrade’;
+            proxy_set_header Host mon01.wbl.com;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_cache_bypass $http_upgrade;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header HTTP_AUTHORIZATION $http_authorization;
+            proxy_pass_header Authorization;
+            proxy_pass http://10.10.50.120:5601;
+
+        }
+}

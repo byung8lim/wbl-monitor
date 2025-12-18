@@ -1,0 +1,25 @@
+﻿---
+- name: mysqld_pkg_dir 생성
+  ansible.builtin.file:
+    path: "{{ mysqld_pkg_dir }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+- name: base_packages RPM 다운로드
+  ansible.builtin.yum:
+    name: "mysql-server"
+    download_only: true
+    download_dir: "{{ mysqld_pkg_dir }}"
+    state: present
+  become: true
+
+- name: mysqld_pkg_dir 디렉토리 및 RPM 소유자 정렬
+  ansible.builtin.file:
+    path: "{{ mysqld_pkg_dir }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    recurse: true

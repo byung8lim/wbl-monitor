@@ -1,0 +1,132 @@
+---
+- name: Rollback ELK packages preparation (master)
+  hosts: master
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: Stop Kibana service
+      ansible.builtin.systemd:
+        name: kibana
+        state: stopped
+        enabled: false
+        daemon_reload: true
+      failed_when: false
+
+    - name: Remove kibana.service unit
+      ansible.builtin.file:
+        path: /etc/systemd/system/kibana.service
+        state: absent
+
+    - name: Remove Kibana installation
+      ansible.builtin.file:
+        path: "{{ kibana_base_dir }}"
+        state: absent
+
+    - name: Remove downloaded ELK packages
+      ansible.builtin.file:
+        path: "{{ elk_packages_dir }}"
+        state: absent
+
+    - name: Remove shared Elasticsearch cert artifacts
+      ansible.builtin.file:
+        path: "{{ elasticsearch_ca_shared_dir }}"
+        state: absent
+
+- name: Rollback ELK packages preparation (elastic)
+  hosts: elastic
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: Stop elasticsearch service
+      ansible.builtin.systemd:
+        name: elasticsearch
+        state: stopped
+        enabled: false
+        daemon_reload: true
+      failed_when: false
+
+    - name: Stop kafka service
+      ansible.builtin.systemd:
+        name: kafka
+        state: stopped
+        enabled: false
+        daemon_reload: true
+      failed_when: false
+
+    - name: Stop ZooKeeper service
+      ansible.builtin.systemd:
+        name: zoo
+        state: stopped
+        enabled: false
+        daemon_reload: true
+      failed_when: false
+
+    - name: Remove systemd unit files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/systemd/system/elasticsearch.service
+        - /etc/systemd/system/kafka.service
+        - /etc/systemd/system/zoo.service
+
+    - name: Remove Elasticsearch directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ elasticsearch_working_dir }}"
+        - "{{ elasticsearch_data_dir }}"
+        - "{{ elasticsearch_log_dir }}"
+        - "{{ elasticsearch_cert_dir }}"
+        - "{{ elasticsearch_base_dir }}"
+
+    - name: Remove Kafka directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ kafka_working_dir }}"
+        - "{{ kafka_data_dir }}"
+        - "{{ kafka_log_data }}"
+        - "{{ kafka_base_dir }}"
+
+    - name: Remove ZooKeeper directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ zoo_working_dir }}"
+        - "{{ zoo_data_dir }}"
+        - "{{ zoo_conf_data }}"
+        - "{{ zoo_log_data }}"
+        - "{{ zoo_base_dir }}"
+
+    - name: Remove Elasticsearch JVM symlink
+      ansible.builtin.file:
+        path: "{{ elk_java_home }}"
+        state: absent
+
+    - name: Remove Elasticsearch sysctl configuration
+      ansible.builtin.file:
+        path: /etc/sysctl.d/99-elasticsearch.conf
+        state: absent
+
+    - name: Reload systemd daemon
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - daemon-reload
+      changed_when: false
+
+    - name: Reload sysctl settings
+      ansible.builtin.command:
+        argv:
+          - sysctl
+          - --system
+      register: sysctl_reload
+      changed_when: "'apply' in sysctl_reload.stdout or 'apply' in sysctl_reload.stderr"

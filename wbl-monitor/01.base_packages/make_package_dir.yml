@@ -1,0 +1,8 @@
+﻿---
+- name: base_packages 생성
+  ansible.builtin.file:
+    path: "{{ base_packages }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"

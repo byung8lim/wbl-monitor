@@ -1,0 +1,57 @@
+---
+- name: Write alertmanager.yml
+  ansible.builtin.copy:
+    dest: "{{ prometheus_base_dir }}/conf/alertmanager.yml"
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    content: |-
+      route:
+        group_by: ['alertname']
+        group_wait: {{ alertmanager_group_wait }}
+        group_interval: {{ alertmanager_group_interval }}
+        repeat_interval: {{ alertmanager_repeat_interval }}
+        receiver: 'web.hook'
+      #receivers:
+      #  - name: 'web.hook'
+      #    webhook_configs:
+      #      - url: '{{ alertmanager_webhoot_endpoint }}'
+      inhibit_rules:
+        - source_match:
+            severity: 'critical'
+          target_match:
+            severity: 'warning'
+          equal: ['alertname', 'dev', 'instance']
+
+- name: Write alertmanager.service
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/alertmanager.service"
+    mode: "0644"
+    owner: "root"
+    group: "root"
+    content: |-
+      [Unit]
+      Description=Prometheus Alertmanager.
+      Documentation=https://github.com/prometheus/alertmanager
+      After=network.target
+      
+      [Service]
+      User={{ ansible_user }}
+      Group={{ ansible_user }}
+      ExecStart={{ prometheus_base_dir }}/bin/alertmanager \
+                --config.file={{ prometheus_base_dir }}/conf/alertmanager.yml \
+                --storage.path={{ prometheus_base_dir }}/data
+      ExecReload=/bin/kill -HUP
+      Restart=on-failure
+      RestartSec=5s
+      LimitNOFILE=65536
+      
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Enable and start alertmanager service
+  ansible.builtin.systemd:
+    name: alertmanager
+    daemon_reload: true
+    enabled: true
+    state: started

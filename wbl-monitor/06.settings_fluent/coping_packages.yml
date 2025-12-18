@@ -1,0 +1,44 @@
+---
+- name: Ensure td-agent packages dire in nfs
+  ansible.builtin.file:
+    path: "{{ td_agent_dir }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+- name: Ensure td-agent tmp dir exists
+  ansible.builtin.file:
+    path: "{{ td_agent_tmp_dir }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+- name: Find downloaded td-agent packages in tmp dir
+  ansible.builtin.find:
+    paths: "{{ td_agent_tmp_dir }}"
+    file_type: file
+  register: td_agent_tmp_dir
+
+- name: Copy td-agent packages from tmp dir to nfs dir
+  ansible.builtin.copy:
+    src: "{{ item.path }}"
+    dest: "{{ td_agent_dir }}/{{ item.path | basename }}"
+    remote_src: true
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+  loop: "{{ td_agent_tmp_dir.files }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
+  when: td_agent_tmp_dir.matched | int > 0
+
+- name: Remove td-agent packages from tmp dir after copy
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ td_agent_tmp_dir.files }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
+  when: td_agent_tmp_dir.matched | int > 0

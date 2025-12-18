@@ -1,0 +1,8 @@
+---
+- name: 컨트롤러에 수집된 RPM을 대상 서버로 복사
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/base_packages_cache/"
+    dest: "{{ base_packages }}/"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    mode: preserve

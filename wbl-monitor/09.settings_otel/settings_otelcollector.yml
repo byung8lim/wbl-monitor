@@ -1,0 +1,49 @@
+---
+- name: Write otel-col.conf
+  ansible.builtin.copy:
+    dest: "{{ otel_base_dir }}/conf/otel-col.conf"
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    content: |-
+      receivers:
+        otlp:
+          protocols:
+            grpc:
+              endpoint: {{ otel_grpc_endpoint }}
+      
+      processors:
+        batch: {}
+      
+      exporters:
+        otlphttp:
+          endpoint: "{{ otlphttp_export_endpoint }}"
+          tls:
+            insecure: true
+
+- name: Write otel-collector.service
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/otel-collector.service"
+    mode: "0644"
+    owner: "root"
+    group: "root"
+    content: |-
+      [Unit]
+      Description=otel-collector
+      After=network.target
+      
+      [Service]
+      User=wbl
+      ExecStart={{ otel_base_dir }}/bin/otelcol --config={{ otel_base_dir }}/conf/otel-col.conf
+      Restart=on-failure
+      
+      [Install]
+      WantedBy=multi-user.target
+
+
+- name: Enable and start otel-collector service
+  ansible.builtin.systemd:
+    name: otel-collector
+    daemon_reload: true
+    enabled: true
+    state: started

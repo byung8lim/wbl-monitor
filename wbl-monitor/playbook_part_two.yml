@@ -1,0 +1,7 @@
+---
+- import_playbook: 04.start_kibana.yml
+- import_playbook: 05.settings_logstash.yml
+- import_playbook: 06.settings_fluent.yml
+- import_playbook: 07.settings_grafana.yml
+- import_playbook: 08.settings_prometheus.yml
+- import_playbook: 09.settings_otel.yml

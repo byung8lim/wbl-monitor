@@ -1,0 +1,78 @@
+---
+- name: td-agent GPG 키 등록
+  ansible.builtin.rpm_key:
+    state: present
+    key: https://packages.treasuredata.com/GPG-KEY-td-agent
+  become: true
+
+- name: td-agent yum repo 등록
+  ansible.builtin.copy:
+    dest: /etc/yum.repos.d/td.repo
+    content: |
+      [treasuredata]
+      name=TreasureData
+      baseurl=http://packages.treasuredata.com/4/redhat/$releasever/$basearch
+      gpgcheck=1
+      gpgkey=https://packages.treasuredata.com/GPG-KEY-td-agent
+    mode: '0644'
+  become: true
+
+- name: td-agent repo check-update
+  ansible.builtin.command: yum check-update
+  register: td_agent_check_update
+  changed_when: false
+  failed_when: td_agent_check_update.rc not in [0, 100]
+  become: true
+
+- name: td_agent_tmp_dir 생성
+  ansible.builtin.file:
+    path: "{{ td_agent_tmp_dir }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+- name: td-agent RPM 다운로드
+  ansible.builtin.yum:
+    name: "td-agent"
+    download_only: true
+    download_dir: "{{ td_agent_tmp_dir }}"
+    state: present
+  become: true
+
+- name: fluentd plugin 최신 버전 정보 조회
+  ansible.builtin.uri:
+    url: "https://rubygems.org/api/v1/gems/{{ item }}.json"
+    return_content: true
+    status_code: 200
+  loop: "{{ fluent_plugin_list }}"
+  register: fluent_plugin_metadata
+  loop_control:
+    label: "{{ item }}"
+
+- name: fluentd plugin 다운로드
+  ansible.builtin.get_url:
+    url: "https://rubygems.org/downloads/{{ item.item }}-{{ (item.content | from_json).version }}.gem"
+    dest: "{{ td_agent_tmp_dir }}/{{ item.item }}-{{ (item.content | from_json).version }}.gem"
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    timeout: 120
+    force: false
+    validate_certs: true
+  loop: "{{ fluent_plugin_metadata.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  register: fluent_plugin_download
+  retries: 3
+  delay: 5
+  until: fluent_plugin_download is succeeded
+
+- name: td_agent_tmp_dir 권한 정렬
+  ansible.builtin.file:
+    path: "{{ td_agent_tmp_dir }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    recurse: true

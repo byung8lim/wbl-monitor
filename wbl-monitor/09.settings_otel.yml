@@ -1,0 +1,12 @@
+---
+- name: prometheus common settings
+  hosts: master
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - import_tasks: 09.settings_otel/extracting_packages.yml
+    - import_tasks: 09.settings_otel/settings_otelcollector.yml
+    - import_tasks: 09.settings_otel/settings_jaeger.yml
+    - import_tasks: 09.settings_otel/settings_javaagent.yml

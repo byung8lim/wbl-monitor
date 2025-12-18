@@ -1,0 +1,137 @@
+---
+- name: Ensure elasticsearch_cert directory exists
+  ansible.builtin.file:
+    path: "{{ elasticsearch_cert_dir }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+
+- name: Create Ca shared director
+  ansible.builtin.file:
+    path: "{{ elasticsearch_ca_shared_dir }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+  become: true
+  become_user: "{{ ansible_user | default('wbl') }}"
+  run_once: true
+  delegate_to: es01
+
+- name: Generate Elasticsearch CA keystore on es01
+  ansible.builtin.command:
+    argv:
+      - bin/elasticsearch-certutil
+      - ca
+      - --out
+      - "{{ elasticsearch_cert_dir }}/elastic-ca.p12"
+      - --pass
+      - ""
+    chdir: "{{ elasticsearch_base_dir }}"
+    creates: "{{ elasticsearch_cert_dir }}/elastic-ca.p12"
+  become: true
+  become_user: "{{ ansible_user | default('wbl') }}"
+  run_once: true
+  delegate_to: es01
+
+- name: Export CA certificate (elastic-ca.crt)
+  ansible.builtin.command:
+    argv:
+      - openssl
+      - pkcs12
+      - -in
+      - "{{ elasticsearch_cert_dir }}/elastic-ca.p12"
+      - -nokeys
+      - -out
+      - "{{ elasticsearch_cert_dir }}/elastic-ca.crt"
+      - -passin
+      - "pass:"
+    creates: "{{ elasticsearch_cert_dir }}/elastic-ca.crt"
+  become: true
+  become_user: "{{ ansible_user | default('wbl') }}"
+  run_once: true
+  delegate_to: es01
+
+- name: Generate HTTP wildcard certificate
+  ansible.builtin.command:
+    argv:
+      - bin/elasticsearch-certutil
+      - cert
+      - --ca
+      - "{{ elasticsearch_cert_dir }}/elastic-ca.p12"
+      - --ca-pass
+      - ""
+      - --name
+      - http-wildcard
+      - --dns
+      - "*.wbl.com"
+      - --out
+      - "{{ elasticsearch_cert_dir }}/http-wildcard.p12"
+      - --pass
+      - ""
+    chdir: "{{ elasticsearch_base_dir }}"
+    creates: "{{ elasticsearch_cert_dir }}/http-wildcard.p12"
+  become: true
+  become_user: "{{ ansible_user | default('wbl') }}"
+  run_once: true
+  delegate_to: es01
+
+- name: Archive certs on es01 for distribution
+  ansible.builtin.command:
+    argv:
+      - tar
+      - czf
+      - "{{ elasticsearch_ca_shared_dir }}/elasticsearch-certs.tgz"
+      - -C
+      - "{{ elasticsearch_cert_dir }}"
+      - .
+    creates: "{{ elasticsearch_ca_shared_dir }}/elasticsearch-certs.tgz"
+  become: true
+  become_user: "{{ ansible_user | default('wbl') }}"
+  run_once: true
+  delegate_to: es01
+
+- name: Distribute cert archive to all elastic nodes
+  ansible.builtin.unarchive:
+    src: "{{ elasticsearch_ca_shared_dir }}/elasticsearch-certs.tgz"
+    dest: "{{ elasticsearch_cert_dir }}"
+    remote_src: true
+  become: true
+  become_user: "{{ ansible_user | default('wbl') }}"
+
+- name: Ensure cert files have correct ownership and permissions
+  ansible.builtin.file:
+    path: "{{ elasticsearch_cert_dir }}"
+    state: directory
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    mode: "0755"
+    recurse: true
+  become: true
+  become_user: root
+
+- name: Generate transport certificate for this node
+  ansible.builtin.command:
+    argv:
+      - bin/elasticsearch-certutil
+      - cert
+      - --ca
+      - "{{ elasticsearch_cert_dir }}/elastic-ca.p12"
+      - --ca-pass
+      - ""
+      - --name
+      - "{{ hostvars[inventory_hostname].host_hostname }}"
+      - --ip
+      - "{{ hostvars[inventory_hostname].ansible_host }}"
+      - --dns
+      - "{{ hostvars[inventory_hostname].host_hostname }}"
+      - --out
+      - "{{ elasticsearch_cert_dir }}/{{ inventory_hostname }}-transport.p12"
+      - --pass
+      - ""
+    chdir: "{{ elasticsearch_base_dir }}"
+    creates: "{{ elasticsearch_cert_dir }}/{{ inventory_hostname }}-transport.p12"
+  become: true
+  become_user: "{{ ansible_user | default('wbl') }}"

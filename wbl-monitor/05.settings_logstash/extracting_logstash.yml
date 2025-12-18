@@ -1,0 +1,27 @@
+---
+- name: Ensure Logstash base directory exists
+  ansible.builtin.file:
+    path: "{{ logstash_base_dir }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+- name: Set Logstash archive name
+  ansible.builtin.set_fact:
+    logstash_archive: "{{ (elk_packages_list | select('search', 'logstash') | list | first | default('')) | basename }}"
+
+- name: Fail if logstash archive is not defined
+  ansible.builtin.fail:
+    msg: "No logstash package found in elk_packages_list."
+  when: logstash_archive == ""
+
+- name: Extract logstash package to base directory
+  ansible.builtin.unarchive:
+    src: "{{ elk_packages_dir }}/{{ logstash_archive }}"
+    dest: "{{ logstash_base_dir }}"
+    remote_src: true
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    extra_opts:
+      - --strip-components=1

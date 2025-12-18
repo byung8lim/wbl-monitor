@@ -1,0 +1,99 @@
+---
+- name: Write server.properties
+  ansible.builtin.copy:
+    dest: "{{ elasticsearch_base_dir }}/config/jvm.options"
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    content: |-
+      -Xms{{ elasticsearch_heap_size }}
+      -Xmx{{ elasticsearch_heap_size }}
+      -XX:+UseG1GC
+      -Djava.io.tmpdir=${ES_TMPDIR}
+      
+      20-:--add-modules=jdk.incubator.vector
+      
+      23:-XX:CompileCommand=dontinline,java/lang/invoke/MethodHandle.setAsTypeCache
+      23:-XX:CompileCommand=dontinline,java/lang/invoke/MethodHandle.asTypeUncached
+      
+      -Dorg.apache.lucene.store.defaultReadAdvice=normal
+      -Dorg.apache.lucene.store.MMapDirectory.sharedArenaMaxPermits=1
+      
+      -XX:+HeapDumpOnOutOfMemoryError
+      -XX:+ExitOnOutOfMemoryError
+      -XX:HeapDumpPath=/data/elasticsearch/dump
+      -XX:ErrorFile=hs_err_pid%p.log
+      
+      -Xlog:gc*,gc+age=trace,safepoint:file=gc.log:utctime,level,pid,tags:filecount=32,filesize=64m
+
+- name: Write elasticsearcy.yml
+  ansible.builtin.copy:
+    dest: "{{ elasticsearch_base_dir }}/config/elasticsearch.yml"
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    content: |-
+      cluster.name: {{ elasticsearch_cluster_name }}
+      discovery.seed_hosts: [{% for host in groups['elastic'] %}"{{ hostvars[host].host_hostname }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+      
+      cluster.initial_master_nodes: [{% for host in groups['elastic'] %}"{{ hostvars[host].host_hostname }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+      
+      node.name: {{ hostvars[inventory_hostname].host_hostname }}
+      network.host: {{ hostvars[inventory_hostname].host_hostname }}
+      path.data: {{ elasticsearch_data_dir }}
+      path.logs: {{ elasticsearch_log_dir }}
+      path.repo:
+        - {{ elasticsearch_index_sn_dir }}
+      xpack.security.enabled: true
+      xpack.security.transport.ssl.enabled: true
+      
+      xpack.security.http.ssl.verification_mode: certificate
+      xpack.security.http.ssl.enabled: true
+      xpack.security.transport.ssl.keystore.path: {{ elasticsearch_cert_dir }}/{{ inventory_hostname }}-transport.p12
+      xpack.security.transport.ssl.certificate_authorities: ["{{ elasticsearch_cert_dir }}/{{ elasticsearch_ca_cert }}"]
+      xpack.security.http.ssl.keystore.path: {{ elasticsearch_cert_dir }}/{{ elasticsearch_https_cert }}
+
+- name: Configure vm.max_map_count for Elasticsearch
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/99-elasticsearch.conf
+    mode: "0644"
+    content: |-
+      vm.max_map_count=262144
+
+- name: Apply sysctl settings
+  ansible.builtin.command:
+    argv:
+      - sysctl
+      - --system
+  register: sysctl_apply
+  changed_when: "'apply' in sysctl_apply.stdout or 'apply' in sysctl_apply.stderr"
+
+- name: Install elasticsearch.service unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/elasticsearch.service
+    mode: "0644"
+    content: |-
+      [Unit]
+      Description=elasticsearch
+      After=network.target
+      
+      [Service]
+      User={{ ansible_user }}
+      Type=simple
+      LimitNOFILE=65536
+      LimitNPROC=4096
+      LimitMEMLOCK=infinity
+      Environment="ES_JAVA_HOME={{ elk_java_home }}"
+      ExecStart={{ elasticsearch_base_dir }}/bin/elasticsearch
+      KillMode=process
+      Restart=on-failure
+      
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Enable and start elasticsearch service
+  ansible.builtin.systemd:
+    name: elasticsearch
+    daemon_reload: true
+    enabled: true
+    state: started

@@ -1,0 +1,98 @@
+---
+- name: Write td-agent.conf for syslog
+  ansible.builtin.copy:
+    dest: "/etc/td-agent/td-agent.conf"
+    mode: "0644"
+    owner: "root"
+    group: "root"
+    content: |-
+      <source>
+        @type tail
+        path /var/log/messages
+        pos_file /var/log/td-agent/messages.pos
+        tag syslog.messages
+        format syslog
+      </source>
+      
+      <filter syslog.**>
+        @type record_transformer
+        <record>
+          hostname "#{Socket.gethostname}"
+          agent    "td-agent"
+        </record>
+      </filter>
+      
+      <match syslog.**>
+        @type kafka2
+        brokers {{ bootstrap_servers }}
+        default_topic {{ syslog_topic }}
+        <format>
+          @type json
+        </format>
+      
+        max_send_retries 3
+        required_acks    -1
+        compression_codec gzip
+      </match>
+      
+      <source>
+        @type tail
+        path /var/log/nginx/access*.log
+        pos_file /var/log/td-agent/access.log.pos
+        tag nginx.access
+        format /(?<message>.*)/
+      </source>
+      
+      <match nginx.access>
+        @type kafka2
+        brokers {{ bootstrap_servers }}
+        zookeeper {{ zookeeper_servers }}
+        default_topic {{ nginx_topic }}
+        <format>
+          @type single_value
+        </format>
+      </match>
+
+
+- name: Install logstash-syslog.service unit
+  ansible.builtin.copy:
+    dest: /usr/lib/systemd/system/td-agent.service
+    mode: "0644"
+    content: |-
+      [Unit]
+      Description=td-agent: Fluentd based data collector for Treasure Data
+      Documentation=https://docs.treasuredata.com/display/public/PD/About+Treasure+Data%%27s+Server-Side+Agent
+      After=network-online.target
+      Wants=network-online.target
+      
+      [Service]
+      User=root
+      Group=root
+      LimitNOFILE=65536
+      Environment=LD_PRELOAD=/opt/td-agent/lib/libjemalloc.so
+      Environment=GEM_HOME=/opt/td-agent/lib/ruby/gems/3.1.0/
+      Environment=GEM_PATH=/opt/td-agent/lib/ruby/gems/3.1.0/
+      Environment=FLUENT_CONF=/etc/td-agent/td-agent.conf
+      Environment=FLUENT_PLUGIN=/etc/td-agent/plugin
+      Environment=FLUENT_SOCKET=/var/run/td-agent/td-agent.sock
+      Environment=TD_AGENT_LOG_FILE=/var/log/td-agent/td-agent.log
+      EnvironmentFile=-/etc/sysconfig/td-agent
+      PIDFile=/var/run/td-agent/td-agent.pid
+      RuntimeDirectory=td-agent
+      Type=forking
+      # XXX: Fix fluentd executables path
+      ExecStart=/opt/td-agent/bin/fluentd --log $TD_AGENT_LOG_FILE --daemon /var/run/td-agent/td-agent.pid $TD_AGENT_OPTIONS
+      ExecStop=/bin/kill -TERM ${MAINPID}
+      ExecReload=/bin/kill -HUP ${MAINPID}
+      Restart=always
+      TimeoutStopSec=120
+      
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Enable and start td-agent service
+  ansible.builtin.systemd:
+    name: td-agent
+    daemon_reload: true
+    enabled: true
+    state: started

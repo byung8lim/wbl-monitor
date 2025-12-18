@@ -1,0 +1,10 @@
+---
+- name: install td-agent
+  ansible.builtin.shell: yum install -y --disablerepo=* --nogpgcheck *.rpm
+  args:
+    chdir: "{{ td_agent_dir }}"
+
+- name: install td-agent plugin
+  ansible.builtin.shell: /opt/td-agent/bin/gem install ./*.gem
+  args:
+    chdir: "{{ td_agent_dir }}"

@@ -1,0 +1,32 @@
+---
+- name: Prepare ELK packages (master)
+  hosts: master
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - import_tasks: 04.settings_elasticsearch/coping_packages.yml
+
+- name: Setup ZooKeeper package (elastic)
+  hosts: elastic
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - import_tasks: 04.settings_elasticsearch/extracting_elasticsearch.yml
+    - import_tasks: 04.settings_elasticsearch/settings_zookeeper.yml
+    - import_tasks: 04.settings_elasticsearch/settings_kafka.yml
+    - import_tasks: 04.settings_elasticsearch/creating_certs.yml
+    - import_tasks: 04.settings_elasticsearch/settings_elasticsearch.yml
+
+- name: Setup Kibana
+  hosts: master
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - import_tasks: 04.settings_elasticsearch/extracting_kibana.yml
+    - import_tasks: 04.settings_elasticsearch/settings_kibana.yml

@@ -1,0 +1,32 @@
+---
+- name: install mysqld
+  ansible.builtin.shell: yum install -y --disablerepo=* --nogpgcheck *.rpm
+  args:
+    chdir: "{{ mysqld_pkg_dir }}"
+
+- name: Enable and start mysqld service
+  ansible.builtin.systemd:
+    name: mysqld
+    daemon_reload: true
+    enabled: true
+    state: started
+
+- name: Change root password and bootstrap grafana database
+  ansible.builtin.shell: |
+    mysql --host=127.0.0.1 --port=3306 -u root <<'SQL'
+    ALTER USER 'root'@'localhost' IDENTIFIED BY '1q2w#e4r5T';
+    CREATE USER IF NOT EXISTS 'grafana'@'%' IDENTIFIED BY '1q2w3e4r5T';
+    CREATE DATABASE IF NOT EXISTS grafana;
+    GRANT ALL PRIVILEGES ON grafana.* TO 'grafana'@'%'
+      WITH GRANT OPTION;
+    FLUSH PRIVILEGES;
+    SQL
+
+- name: Create mysqld_exporter user for Prometheus
+  ansible.builtin.shell: |
+    mysql --host=127.0.0.1 --port=3306 -u root -p'1q2w#e4r5T' mysql <<'SQL'
+    CREATE USER IF NOT EXISTS 'exporter'@'localhost'
+      IDENTIFIED BY '1q2w#e4r5T' WITH MAX_USER_CONNECTIONS 3;
+    GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.* TO 'exporter'@'localhost';
+    FLUSH PRIVILEGES;
+    SQL

@@ -1,0 +1,48 @@
+---
+- name: Ensure Elasticsearch base directory exists
+  ansible.builtin.file:
+    path: "{{ elasticsearch_base_dir }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+- name: Set elasticsearch archive name
+  ansible.builtin.set_fact:
+    elasticsearch_archive: "{{ (elk_packages_list | select('search', 'elasticsearch') | list | first | default('')) | basename }}"
+
+- name: Fail if elasticsearch archive is not defined
+  ansible.builtin.fail:
+    msg: "No elasticsearch package found in elk_packages_list."
+  when: elasticsearch_archive == ""
+
+- name: Extract elasticsearch package to base directory
+  ansible.builtin.unarchive:
+    src: "{{ elk_packages_dir }}/{{ elasticsearch_archive }}"
+    dest: "{{ elasticsearch_base_dir }}"
+    remote_src: true
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    extra_opts:
+      - --strip-components=1
+
+- name: Create symlink /opt/jdk -> elasticsearch bundled JDK
+  ansible.builtin.file:
+    src: "{{ elasticsearch_base_dir }}/jdk"
+    dest: /opt/jdk
+    state: link
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    force: true
+
+- name: Ensure elasticsearch working/data/conf/log directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+  loop:
+    - "{{ elasticsearch_working_dir }}"
+    - "{{ elasticsearch_data_dir }}"
+    - "{{ elasticsearch_log_dir }}"

@@ -1,0 +1,21 @@
+---
+- name: fluentd for mon01
+  hosts: master
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - import_tasks: 06.settings_fluent/coping_packages.yml
+    - import_tasks: 06.settings_fluent/installing_tdagent.yml
+    - import_tasks: 06.settings_fluent/settings_nginx.yml
+
+- name: fluentd for elastic
+  hosts: elastic
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - import_tasks: 06.settings_fluent/installing_tdagent.yml
+    - import_tasks: 06.settings_fluent/settings_syslog.yml

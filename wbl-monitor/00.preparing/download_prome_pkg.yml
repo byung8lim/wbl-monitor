@@ -1,0 +1,24 @@
+﻿---
+- name: prome_tmp_dir 생성
+  ansible.builtin.file:
+    path: "{{ prome_tmp_dir }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
+- name: Download prome packages
+  ansible.builtin.get_url:
+    url: "{{ item }}"
+    dest: "{{ prome_tmp_dir }}/{{ item | basename }}"
+    mode: "0644"
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+    timeout: 120
+    force: false
+    validate_certs: false
+  register: download_result
+  retries: 5
+  delay: 10
+  until: download_result is succeeded
+  loop: "{{ prometheus_pkg_list }}"

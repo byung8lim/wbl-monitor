@@ -1,0 +1,10 @@
+---
+- name: fluentd for mon01
+  hosts: master
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - import_tasks: 07.settings_grafana/installing_mysqld.yml
+    - import_tasks: 07.settings_grafana/installing_grafana.yml

@@ -1,0 +1,68 @@
+---
+- name: install nginx
+  ansible.builtin.shell: yum install -y --disablerepo=* --nogpgcheck *.rpm
+  args:
+    chdir: "{{ nginx_pkg_dir }}"
+
+- name: Write nginx.conf
+  ansible.builtin.copy:
+    dest: "/etc/nginx/nginx.conf"
+    mode: "0644"
+    owner: "root"
+    group: "root"
+    content: |-
+      user root;
+      worker_processes auto;
+      error_log /var/log/nginx/error.log;
+      pid /var/run/nginx.pid;
+      
+      include /usr/share/nginx/modules/*.conf;
+      
+      events {
+          worker_connections 1024;
+      }
+      
+      http {
+          log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                            '$status $body_bytes_sent "$http_referer" '
+                            '"$http_user_agent" "$http_x_forwarded_for" $upstream_response_time';
+      
+          access_log  /var/log/nginx/access.log  main;
+      
+          sendfile            on;
+          tcp_nopush          on;
+          tcp_nodelay         on;
+          keepalive_timeout   65;
+          types_hash_max_size 2048;
+      
+          include             /etc/nginx/mime.types;
+          default_type        application/octet-stream;
+      
+          include /etc/nginx/conf.d/*.conf;
+      }
+
+- name: Write monitoring.conf
+  ansible.builtin.copy:
+    dest: "/etc/nginx/conf.d/monitoring.conf"
+    mode: "0644"
+    owner: "root"
+    group: "root"
+    content: |-
+      server {
+          server_name localhost;
+          server_tokens off;
+          listen 19090;
+          location /metrics {
+              if ($request_method !~ ^(GET|POST)$) {
+                  return 403;
+              }
+              stub_status on;
+          }
+      }
+
+- name: Enable and start nginx service
+  ansible.builtin.systemd:
+    name: nginx
+    daemon_reload: true
+    enabled: true
+    state: started

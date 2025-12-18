@@ -1,0 +1,130 @@
+---
+- name: Rollback Prometheus common exporters
+  hosts: all_hosts
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: Stop common exporters
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+        daemon_reload: true
+      loop:
+        - node_exporter
+        - process_exporter
+      failed_when: false
+
+    - name: Remove common exporter systemd units
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/systemd/system/node_exporter.service
+        - /etc/systemd/system/process_exporter.service
+
+    - name: Remove common exporter configs
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ prometheus_base_dir }}/conf/node_exporter.conf"
+        - "{{ prometheus_base_dir }}/conf/process_exporter.yml"
+        - "{{ prometheus_base_dir }}/conf/process_exporter.yaml"
+
+- name: Rollback Prometheus exporters on elastic nodes
+  hosts: elastic
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: Stop elastic exporters
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+        daemon_reload: true
+      loop:
+        - kafka_exporter
+        - elasticsearch_exporter
+      failed_when: false
+
+    - name: Remove elastic exporter systemd units
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/systemd/system/kafka_exporter.service
+        - /etc/systemd/system/elasticsearch_exporter.service
+
+    - name: Remove Prometheus installation on elastic nodes
+      ansible.builtin.file:
+        path: "{{ prometheus_base_dir }}"
+        state: absent
+
+    - name: Reload systemd daemon (elastic)
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - daemon-reload
+      changed_when: false
+
+- name: Rollback Prometheus services on master
+  hosts: master
+  become: true
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: Stop Prometheus-related services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+        daemon_reload: true
+      loop:
+        - prometheus
+        - alertmanager
+        - mysqld_exporter
+        - zookeeper_exporter
+        - node_exporter
+        - process_exporter
+      failed_when: false
+
+    - name: Remove Prometheus-related systemd units
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/systemd/system/prometheus.service
+        - /etc/systemd/system/alertmanager.service
+        - /etc/systemd/system/mysqld_exporter.service
+        - /etc/systemd/system/zookeeper_exporter.service
+        - /etc/systemd/system/node_exporter.service
+        - /etc/systemd/system/process_exporter.service
+
+    - name: Remove Prometheus and exporter configuration
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ prometheus_base_dir }}/conf"
+        - "{{ prometheus_base_dir }}/data"
+        - "{{ prometheus_base_dir }}/consoles"
+        - "{{ prometheus_base_dir }}/console_libraries"
+        - "{{ prometheus_base_dir }}/bin"
+
+    - name: Remove Prometheus base directory
+      ansible.builtin.file:
+        path: "{{ prometheus_base_dir }}"
+        state: absent
+
+    - name: Reload systemd daemon (master)
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - daemon-reload
+      changed_when: false
