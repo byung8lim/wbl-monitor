@@ -75,12 +75,12 @@
       
       [database]
       
-      type = mysql
-      host = {{ mysqld_svc_host }}:{{ mysqld_svc_port }}
-      name = {{ grafana_database_name }}
-      user = {{ grafana_user_name }}
+      ;type = mysql
+      ;host = {{ mysqld_svc_host }}:{{ mysqld_svc_port }}
+      ;name = {{ grafana_database_name }}
+      ;user = {{ grafana_user_name }}
       
-      url = mysql://{{ grafana_user_name }}:{{ grafana_user_password }}@{{ mysqld_svc_host }}:{{ mysqld_svc_port }}/{{ grafana_database_name }}
+      ;url = mysql://{{ grafana_user_name }}:{{ grafana_user_password }}@{{ mysqld_svc_host }}:{{ mysqld_svc_port }}/{{ grafana_database_name }}
       
       ;ssl_mode = disable
       
