@@ -60,6 +60,29 @@
           }
       }
 
+- name: Write monitoring.conf
+  ansible.builtin.copy:
+    dest: "/etc/nginx/conf.d/webhook.conf"
+    mode: "0644"
+    owner: "root"
+    group: "root"
+    content: |-
+      server {
+          listen 18080;
+          server_name _;
+          access_log /var/log/nginx/alertmanager_webhook_access.log;
+          error_log  /var/log/nginx/alertmanager_webhook_error.log;
+      
+          location /webhook {
+              limit_except POST {
+                  deny all;
+              }
+              client_max_body_size 5m;
+              default_type application/json;
+              return 200 '{"status":"ok"}';
+          }
+      }
+
 - name: Enable and start nginx service
   ansible.builtin.systemd:
     name: nginx

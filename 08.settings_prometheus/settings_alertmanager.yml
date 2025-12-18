@@ -6,16 +6,21 @@
     owner: "{{ ansible_user | default('wbl') }}"
     group: "{{ ansible_user | default('wbl') }}"
     content: |-
+      global:
+        resolve_timeout: {{ alert_global_resolve_timeout }}
+      
       route:
-        group_by: ['alertname']
+        group_by: [{{ alert_group_by }}]
         group_wait: {{ alertmanager_group_wait }}
         group_interval: {{ alertmanager_group_interval }}
         repeat_interval: {{ alertmanager_repeat_interval }}
-        receiver: 'web.hook'
-      #receivers:
-      #  - name: 'web.hook'
-      #    webhook_configs:
-      #      - url: '{{ alertmanager_webhoot_endpoint }}'
+        receiver: '{{ alertmanager_webook_receiver }}'
+      
+      receivers:
+        - name: '{{ alertmanager_webook_receiver }}'
+          webhook_configs:
+            - url: '{{ alertmanager_webhoot_endpoint }}'
+      
       inhibit_rules:
         - source_match:
             severity: 'critical'

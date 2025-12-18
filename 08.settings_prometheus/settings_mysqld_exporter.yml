@@ -34,7 +34,7 @@
       Group={{ ansible_user }}
       
       Type=simple
-      Environment='DATA_SOURCE_NAME={{ mysqld_mon_user }}:{{ mysqld_mon_pwd }}@tcp({{ 127.0.0.1 }}:{{ mysqld_svc_port }})/'
+      Environment='DATA_SOURCE_NAME={{ mysqld_mon_user }}:{{ mysqld_mon_pwd }}@tcp(localhost:{{ mysqld_svc_port }})/'
       ExecStart={{ prometheus_base_dir }}/bin/mysqld_exporter \
         --config.my-cnf {{ prometheus_base_dir }}/conf/my.conf \
         --collect.global_status \

@@ -20,6 +20,13 @@
           endpoint: "{{ otlphttp_export_endpoint }}"
           tls:
             insecure: true
+      
+      service:
+        pipelines:
+          traces:
+            receivers: [otlp]
+            processors: [batch]
+            exporters: [otlphttp]
 
 - name: Write otel-collector.service
   ansible.builtin.copy:
