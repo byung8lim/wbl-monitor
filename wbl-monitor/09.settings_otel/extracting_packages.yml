@@ -19,6 +19,14 @@
     msg: "No openjdk_archive package found in {{ otel_pkg_list }}."
   when: openjdk_archive == ""
 
+- name: openjdk directory 생성
+  ansible.builtin.file:
+    path: "{{ openjdk_dir }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user | default('wbl') }}"
+    group: "{{ ansible_user | default('wbl') }}"
+
 - name: Extract openjdk package to base directory
   ansible.builtin.unarchive:
     src: "{{ otel_pkg_dir }}/{{ openjdk_archive }}"
@@ -26,6 +34,9 @@
     remote_src: true
     owner: "{{ ansible_user | default('wbl') }}"
     group: "{{ ansible_user | default('wbl') }}"
+    extra_opts:
+      - --strip-components=1
+    creates: "{{ openjdk_dir }}/bin/java"
 
 - name: Set javaagent archive name
   ansible.builtin.set_fact:
@@ -36,11 +47,28 @@
     msg: "No javaagent package found in {{ otel_pkg_list }}."
   when: javaagent_archive == ""
 
-- name: Move javaagent_archive binaries to bin directory
+- name: Stat downloaded javaagent file
+  ansible.builtin.stat:
+    path: "{{ otel_pkg_dir }}/{{ javaagent_archive }}"
+  register: javaagent_src_stat
+
+- name: Stat installed javaagent file
+  ansible.builtin.stat:
+    path: "{{ otel_base_dir }}/bin/opentelemetry-javaagent.jar"
+  register: javaagent_dest_stat
+
+- name: Move javaagent to otel bin directory
   ansible.builtin.command:
-    cmd: mv "{{ otel_pkg_dir }}/{{ javaagent_archive }}" "{{ otel_base_dir }}/bin/"
-    creates: "{{ otel_base_dir }}/bin/{{ javaagent_archive }}"
-    mode: "0665"
+    cmd: mv "{{ otel_pkg_dir }}/{{ javaagent_archive }}" "{{ otel_base_dir }}/bin/opentelemetry-javaagent.jar"
+  when:
+    - javaagent_src_stat.stat.exists
+    - not javaagent_dest_stat.stat.exists
+
+- name: Set javaagent file permission
+  ansible.builtin.file:
+    path: "{{ otel_base_dir }}/bin/opentelemetry-javaagent.jar"
+    state: file
+    mode: "0644"
     owner: "{{ ansible_user | default('wbl') }}"
     group: "{{ ansible_user | default('wbl') }}"
 

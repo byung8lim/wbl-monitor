@@ -1,7 +1,7 @@
 ---
 - name: Write my.cnf
   ansible.builtin.copy:
-    dest: "{{ prometheus_base_dir }}/conf/my.cnf"
+    dest: "{{ prometheus_base_dir }}/conf/my.conf"
     mode: "0644"
     owner: "{{ ansible_user | default('wbl') }}"
     group: "{{ ansible_user | default('wbl') }}"
@@ -34,7 +34,7 @@
       Group={{ ansible_user }}
       
       Type=simple
-      Environment='DATA_SOURCE_NAME={{ mysqld_mon_user }}:{{ mysqld_mon_pwd }}@tcp({{ mysqld_svc_host }}:{{ mysqld_svc_port }})/'
+      Environment='DATA_SOURCE_NAME={{ mysqld_mon_user }}:{{ mysqld_mon_pwd }}@tcp({{ 127.0.0.1 }}:{{ mysqld_svc_port }})/'
       ExecStart={{ prometheus_base_dir }}/bin/mysqld_exporter \
         --config.my-cnf {{ prometheus_base_dir }}/conf/my.conf \
         --collect.global_status \
